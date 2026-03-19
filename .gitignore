@@ -1,0 +1,12 @@
+gitignore
+# 忽略 Node.js 依赖文件夹
+node_modules/
+
+# 可选：同时忽略其他不需要上传的文件（Node 项目常用）
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+.DS_Store
+dist/
+build/
