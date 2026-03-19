@@ -3,7 +3,8 @@ import { generateResult } from './utils';
 import { 
     fetchUser, fetchActiveCars, fetchAddresses, fetchStores, fetchShippingHistory,
     apiLogin, apiLogout, apiCreateAddress, apiUpdateAddress, apiDeleteAddress,
-    apiJoinCar, apiCreateCar, apiCreateShippingRecord, apiAddBalance
+    apiJoinCar, apiCreateCar, apiCreateShippingRecord, apiAddBalance,
+    apiRegister, apiForgotPassword, apiGrantAdmin
 } from './api';
 
 import { BottomNav } from './components/layout/BottomNav';
@@ -75,11 +76,30 @@ export default function App() {
 
     const checkAuth = () => { if (!user.isLoggedIn) { setModal({ type: 'login' }); return false; } return true; };
     
-    const handleLogin = async (r) => { 
-        const res = await apiLogin(r);
+    const handleAuth = async (action, phone, password) => { 
+        let res;
+        if (action === 'login') res = await apiLogin(phone, password);
+        else if (action === 'register') res = await apiRegister(phone, password);
+        else if (action === 'forgot') res = await apiForgotPassword(phone, password);
+
         if (res.success) {
-            setUser(res.data); 
-            setModal({ type: 'info', title: '登录成功!', content: '欢迎回来！' }); 
+            if (action === 'forgot') {
+                setModal({ type: 'info', title: '操作成功', content: res.message });
+            } else {
+                setUser(res.data); 
+                setModal({ type: 'info', title: '操作成功!', content: res.message }); 
+            }
+        } else {
+            alert(res.message);
+        }
+    };
+    
+    const handleGrantAdmin = async (phone) => {
+        const res = await apiGrantAdmin(phone);
+        if (res.success) {
+            setModal({ type: 'info', title: '授权成功', content: res.message });
+        } else {
+            alert(res.message);
         }
     };
     
@@ -197,10 +217,10 @@ export default function App() {
             {view === 'shipping_summary' && <ShippingSummaryView setView={setView} addresses={addresses} stores={stores} shippingMethod={shippingMethod} setShippingMethod={setShippingMethod} selectedAddressId={selectedAddressId} setSelectedAddressId={setSelectedAddressId} handleConfirmShipping={handleConfirmShipping} setModal={setModal} />}
             {view === 'profile' && <ProfileView user={user} addresses={addresses} setModal={setModal} handleLogout={handleLogout} setUser={setUser} deleteAddress={deleteAddress} setView={setView} editAddress={editAddress} handleAddBalance={handleAddBalance} />}
             {view === 'shipping_history' && <ShippingHistoryView history={shippingHistory} setView={setView} />}
-            {view === 'admin' && user.role === 'admin' && <AdminView form={form} setForm={setForm} handleCreateCar={handleCreateCar} stores={stores} setModal={setModal} />}
+            {view === 'admin' && user.role === 'admin' && <AdminView form={form} setForm={setForm} handleCreateCar={handleCreateCar} stores={stores} setModal={setModal} handleGrantAdmin={handleGrantAdmin} />}
 
             <BottomNav view={view} setView={setView} userRole={user.role} />
-            <ModalPortal modal={modal} setModal={setModal} handleLogin={handleLogin} setJoinCount={setJoinCount} joinCount={joinCount} handleJoinByCount={handleJoinByCount} tempAddress={tempAddress} setTempAddress={setTempAddress} handleSaveAddress={handleSaveAddress} user={user} addresses={addresses} selectedAddressId={selectedAddressId} setSelectedAddressId={setSelectedAddressId} />
+            <ModalPortal modal={modal} setModal={setModal} handleAuth={handleAuth} setJoinCount={setJoinCount} joinCount={joinCount} handleJoinByCount={handleJoinByCount} tempAddress={tempAddress} setTempAddress={setTempAddress} handleSaveAddress={handleSaveAddress} user={user} addresses={addresses} selectedAddressId={selectedAddressId} setSelectedAddressId={setSelectedAddressId} />
         </div>
     );
 }

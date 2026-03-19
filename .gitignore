@@ -10,3 +10,81 @@ yarn-error.log*
 .DS_Store
 dist/
 build/
+
+
+# ==================== Python 核心忽略项 ====================
+# 字节码文件（Python 编译生成，跨环境无用）
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 虚拟环境（本地开发环境，绝对不能提交）
+venv/
+env/
+ENV/
+.venv/
+.env/
+env.local/
+env.*.local/
+
+# 依赖安装缓存
+.pip/
+pip-wheel-metadata/
+
+# ==================== 运行时/构建产物 ====================
+# 打包产物（如 wheel、egg 包）
+*.egg-info/
+*.egg
+dist/
+build/
+sdist/
+
+# 日志文件（动态生成，包含运行信息）
+logs/
+*.log
+.log/
+pip-log.txt
+
+# 数据库文件（如 SQLite 本地库）
+*.db
+*.sqlite3
+*.db-journal
+
+# 缓存文件
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# ==================== 开发工具/编辑器 ====================
+# IDE 配置（PyCharm/VSCode 等）
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store  # Mac 系统隐藏文件
+Thumbs.db  # Windows 系统隐藏文件
+
+# ==================== 环境变量/敏感配置 ====================
+# 环境变量文件（包含密钥、数据库密码等）
+.env
+.env.local
+.env.dev
+.env.prod
+
+# ==================== 其他通用项 ====================
+# 临时文件
+tmp/
+temp/
+*.tmp
+*.temp
+
+# 测试报告
+reports/
+test-results/
+
+# 操作系统临时文件
+*.bak
+*.swp
+*.swo

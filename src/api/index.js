@@ -1,91 +1,124 @@
-import { mockUser, mockCars, mockAddresses, mockStores, mockShippingHistory } from './mockData';
+const request = async (url, options = {}) => {
+    const headers = {
+        'Content-Type': 'application/json',
+        ...options.headers,
+    };
 
-const delay = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));
-
-// 标准 RESTful 外壳封装函数
-const createResponse = (data = null, message = "success", code = 200) => ({
-    success: code >= 200 && code < 300,
-    code,
-    data,
-    message
-});
+    try {
+        const response = await fetch(`/api/v1${url}`, {
+            ...options,
+            headers,
+        });
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('API Request Error:', error);
+        return { success: false, code: 500, message: 'Network error', data: null };
+    }
+};
 
 // --- 获取数据接口 ---
 export const fetchUser = async () => {
-    await delay();
-    return createResponse({ ...mockUser });
+    return await request('/user/profile');
 };
 
 export const fetchActiveCars = async () => {
-    await delay();
-    return createResponse([...mockCars]);
+    return await request('/cars/active/');
 };
 
 export const fetchAddresses = async () => {
-    await delay();
-    return createResponse([...mockAddresses]);
+    return await request('/user/address/');
 };
 
 export const fetchStores = async () => {
-    await delay();
-    return createResponse([...mockStores]);
+    return await request('/stores');
 };
 
 export const fetchShippingHistory = async () => {
-    await delay(300);
-    return createResponse([...mockShippingHistory]);
+    return await request('/user/shipping-history');
 };
 
 // --- 操作/提交数据接口 ---
 
-export const apiLogin = async (role) => {
-    await delay();
-    return createResponse({ ...mockUser, isLoggedIn: true, role });
+export const apiLogin = async (phone, password) => {
+    return await request('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ phone, password }),
+    });
+};
+
+export const apiRegister = async (phone, password) => {
+    return await request('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ phone, password }),
+    });
+};
+
+export const apiForgotPassword = async (phone, password) => {
+    return await request('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ phone, password }),
+    });
+};
+
+export const apiGrantAdmin = async (phone) => {
+    return await request('/admin/grant', {
+        method: 'POST',
+        body: JSON.stringify({ phone }),
+    });
 };
 
 export const apiLogout = async () => {
-    await delay();
-    return createResponse();
+    return await request('/auth/logout', {
+        method: 'POST',
+    });
 };
 
 export const apiCreateAddress = async (addressData) => {
-    await delay();
-    return createResponse({ ...addressData, id: Date.now() });
+    // 假设 addressData 恰好匹配后端的 address 模型字段名
+    return await request('/user/address/', {
+        method: 'POST',
+        body: JSON.stringify(addressData),
+    });
 };
 
 export const apiUpdateAddress = async (id, addressData) => {
-    await delay();
-    return createResponse();
+    return await request(`/user/address/${id}/`, {
+        method: 'PUT',
+        body: JSON.stringify(addressData),
+    });
 };
 
 export const apiDeleteAddress = async (id) => {
-    await delay();
-    return createResponse();
+    return await request(`/user/address/${id}/`, {
+        method: 'DELETE',
+    });
 };
 
 export const apiJoinCar = async (carId, count, totalCost) => {
-    await delay();
-    return createResponse();
+    return await request(`/cars/${carId}/join`, {
+        method: 'POST',
+        body: JSON.stringify({ count, totalCost }),
+    });
 };
 
 export const apiCreateCar = async (carData) => {
-    await delay();
-    return createResponse({ ...carData, id: `car-${Date.now()}` });
+    return await request('/admin/cars', {
+        method: 'POST',
+        body: JSON.stringify(carData),
+    });
 };
 
 export const apiCreateShippingRecord = async (items, method) => {
-    await delay();
-    const newRecord = { 
-        id: Date.now(), 
-        items, 
-        method, 
-        status: '打包中', 
-        date: new Date().toLocaleString('zh-CN', { hour12: false }) 
-    };
-    return createResponse(newRecord);
+    return await request('/user/shipping', {
+        method: 'POST',
+        body: JSON.stringify({ items, method }),
+    });
 };
 
 export const apiAddBalance = async (amount) => {
-    await delay();
-    return createResponse();
+    return await request('/user/balance/recharge', {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+    });
 };
