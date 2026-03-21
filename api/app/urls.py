@@ -12,6 +12,7 @@ urlpatterns = [
     path('stores', views.store_list),
     path('user/shipping-history', views.shipping_history),
     path('auth/login', views.auth_login),
+    path('auth/send-code', views.auth_send_code),
     path('auth/logout', views.auth_logout),
     path('auth/register', views.auth_register),
     path('auth/forgot-password', views.auth_forgot),
@@ -19,5 +20,8 @@ urlpatterns = [
     path('cars/<int:pk>/join', views.car_join),
     path('admin/cars', views.car_create),
     path('user/shipping', views.submit_shipping),
+    path('auth/verify-pickup', views.verify_pickup_code),
+    path('admin/shippings', views.list_all_shippings),
+    path('admin/shippings/<int:pk>', views.update_shipping_admin),
     path('user/balance/recharge', views.balance_recharge),
 ]

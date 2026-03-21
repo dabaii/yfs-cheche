@@ -18,11 +18,13 @@ class ActiveCar(models.Model):
     discount = models.IntegerField(default=100, verbose_name="折扣(%)")
     description = models.TextField(verbose_name="前情提要")
     status = models.CharField(max_length=20, default='open', choices=[('open', '销售中'), ('unboxed', '已开箱')], verbose_name="运作状态")
+    order = models.IntegerField(default=0, verbose_name="排序权重(大者靠前)")
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
         verbose_name = "发售车队"
         verbose_name_plural = "发售车队(商品箱)"
+        ordering = ['-order', '-created_at']
 
     def __str__(self):
         return self.name
@@ -74,6 +76,16 @@ class Store(models.Model):
     def __str__(self):
         return self.name
 
+class ExpressCompany(models.Model):
+    name = models.CharField(max_length=100, verbose_name="快递公司名称")
+    
+    class Meta:
+        verbose_name = "快递字典"
+        verbose_name_plural = "快递公司字典"
+
+    def __str__(self):
+        return self.name
+
 class ItemRecord(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='items')
     prize = models.ForeignKey(Prize, on_delete=models.CASCADE, verbose_name="掉落原奖项")
@@ -89,8 +101,19 @@ class ItemRecord(models.Model):
 class ShippingRecord(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='shippings')
     items = models.ManyToManyField(ItemRecord, related_name='shipping_orders', verbose_name="被打包的单品")
-    method = models.CharField(max_length=20, default='express', verbose_name="传送承制方")
-    status = models.CharField(max_length=20, default='打包中', verbose_name="物流跟踪态")
+    method = models.CharField(max_length=20, default='express', choices=[('express', '快递'), ('pickup', '自提')], verbose_name="发货方式")
+    receiver_info = models.TextField(blank=True, null=True, verbose_name="发货地址/据点详情")
+    pickup_code = models.CharField(max_length=4, blank=True, null=True, verbose_name="自提验证码")
+    status = models.CharField(max_length=20, default='打包中', choices=[
+        ('打包中', '打包中'),
+        ('运输中', '运输中'),
+        ('待自提', '待自提'),
+        ('已达成', '已达成'),
+        ('奖励交付', '奖励交付'),
+    ], verbose_name="物流状态")
+    courier = models.ForeignKey(ExpressCompany, on_delete=models.SET_NULL, blank=True, null=True, verbose_name="承运商")
+    tracking_number = models.CharField(max_length=100, blank=True, null=True, verbose_name="快递单号")
+    shipping_fee = models.DecimalField(max_digits=10, decimal_places=2, default=10.00, verbose_name="物流资费(元)")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="申请创建刻度")
 
     class Meta:

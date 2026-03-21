@@ -69,7 +69,7 @@ class AddressViewSet(viewsets.ModelViewSet):
         return BaseResponse.success(message="删除成功")
 
 def get_user_dict(user):
-    items = user.items.all() if hasattr(user, 'items') else []
+    items = user.items.filter(status='in_warehouse') if hasattr(user, 'items') else []
     item_list = []
     for item in items:
         item_list.append({
@@ -111,20 +111,36 @@ def store_list(request):
 
 @api_view(['GET'])
 def shipping_history(request):
-    history = ShippingRecord.objects.all()
+    if not request.user.is_authenticated:
+        return BaseResponse.success([])
+    history = ShippingRecord.objects.filter(user=request.user).prefetch_related('items__prize').order_by('-created_at')
     return BaseResponse.success(ShippingRecordSerializer(history, many=True).data)
 
 from django.contrib.auth import authenticate, login, logout
 
 @api_view(['POST'])
+def auth_send_code(request):
+    # In dev, we just pretend it's sent and code is 111111
+    return BaseResponse.success(message="验证码已发送 (默认 111111)")
+
+@api_view(['POST'])
 def auth_login(request):
     phone = request.data.get('phone')
-    password = request.data.get('password')
-    user = authenticate(request, username=phone, password=password)
-    if user is not None:
-        login(request, user)
-        return BaseResponse.success(get_user_dict(user), message="登录成功")
-    return BaseResponse.error("手机号码或密码错误")
+    code = request.data.get('code')
+    
+    if not phone:
+        return BaseResponse.error("请输入手机号码")
+    if code != '111111':
+        return BaseResponse.error("验证码错误")
+
+    # Check if user exists, else auto-register
+    user, created = CustomUser.objects.get_or_create(username=phone)
+    if created:
+        user.set_unusable_password()
+        user.save()
+        
+    login(request, user)
+    return BaseResponse.success(get_user_dict(user), message="登录成功" if not created else "注册并登录成功")
 
 @api_view(['POST'])
 def auth_logout(request):
@@ -133,28 +149,23 @@ def auth_logout(request):
 
 @api_view(['POST'])
 def auth_register(request):
-    phone = request.data.get('phone')
-    password = request.data.get('password')
-    if not phone or not password:
-        return BaseResponse.error("请输入手机号码和密码")
-    if CustomUser.objects.filter(username=phone).exists():
-        return BaseResponse.error("该手机号码已被注册")
-    
-    user = CustomUser.objects.create_user(username=phone, password=password)
-    login(request, user)
-    return BaseResponse.success(get_user_dict(user), message="注册成功")
+    # This might be deprecated but kept for safety or updated to match auto-reg
+    return auth_login(request)
 
 @api_view(['POST'])
 def auth_forgot(request):
     phone = request.data.get('phone')
-    new_password = request.data.get('password')
+    code = request.data.get('code')
+    if code != '111111':
+        return BaseResponse.error("验证码错误")
+    
     try:
         user = CustomUser.objects.get(username=phone)
-        user.set_password(new_password)
-        user.save()
-        return BaseResponse.success(message="密码重置成功，请重新登录")
+        # For code-based login projects, "forgot" might just be another login path
+        login(request, user)
+        return BaseResponse.success(get_user_dict(user), message="身份验证成功")
     except CustomUser.DoesNotExist:
-        return BaseResponse.error("该手机号码尚未注册")
+        return BaseResponse.error("该手机号码尚未参与冒险")
 
 @api_view(['POST'])
 def admin_grant(request):
@@ -258,9 +269,100 @@ def car_join(request, pk):
 def car_create(request):
     return BaseResponse.success({}, message="全新盲盒上架！")
 
+import string
+
+def generate_pickup_code():
+    while True:
+        code = ''.join(random.choices(string.digits, k=4))
+        # Unique among active pickup orders
+        if not ShippingRecord.objects.filter(pickup_code=code, status='等待勇者').exists():
+            return code
+
 @api_view(['POST'])
 def submit_shipping(request):
-    return BaseResponse.success({"id": 1, "status": "打包中"}, message="打包请求已被接收！")
+    if not request.user.is_authenticated:
+        return BaseResponse.error("请先登录")
+
+    items_data = request.data.get('items', [])
+    method = request.data.get('method', 'express')
+    receiver_info = request.data.get('receiver_info', '')
+
+    if not items_data:
+        return BaseResponse.error("请选择要传送的物品")
+
+    # Extract item IDs
+    item_ids = [item.get('id') or item.get('timestamp') for item in items_data if isinstance(item, dict)]
+    if not item_ids:
+        return BaseResponse.error("物品数据格式错误")
+
+    with transaction.atomic():
+        user_items = ItemRecord.objects.filter(
+            id__in=item_ids,
+            user=request.user,
+            status='in_warehouse'
+        ).select_for_update()
+
+        if user_items.count() == 0:
+            return BaseResponse.error("未找到可传送的物品")
+
+        # Logic for status and code
+        status = '运输中' if method == 'express' else '等待勇者'
+        pickup_code = generate_pickup_code() if method == 'pickup' else None
+
+        record = ShippingRecord.objects.create(
+            user=request.user,
+            method=method,
+            receiver_info=receiver_info,
+            pickup_code=pickup_code,
+            status=status
+        )
+
+        record.items.set(user_items)
+        user_items.update(status='shipping')
+
+    record.refresh_from_db()
+    serialized = ShippingRecordSerializer(record).data
+    return BaseResponse.success(serialized, message="打包请求已被接收！" if method == 'express' else f"自提码: {pickup_code}")
+
+@api_view(['POST'])
+def verify_pickup_code(request):
+    code = request.data.get('code')
+    if not code:
+        return BaseResponse.error("请输入自提码")
+    
+    try:
+        record = ShippingRecord.objects.get(pickup_code=code, status='等待勇者')
+        return BaseResponse.success(ShippingRecordSerializer(record).data)
+    except ShippingRecord.DoesNotExist:
+        return BaseResponse.error("未找到有效的自提单，请检查验证码")
+
+@api_view(['GET'])
+def list_all_shippings(request):
+    if not request.user.is_authenticated or request.user.role != 'admin':
+        return BaseResponse.error("权限拒绝")
+    
+    shippings = ShippingRecord.objects.all()
+    serializer = ShippingRecordSerializer(shippings, many=True)
+    return BaseResponse.success(serializer.data)
+
+@api_view(['POST'])
+def update_shipping_admin(request, pk):
+    if not request.user.is_authenticated or request.user.role != 'admin':
+        return BaseResponse.error("权限拒绝")
+    
+    try:
+        record = ShippingRecord.objects.get(pk=pk)
+    except ShippingRecord.DoesNotExist:
+        return BaseResponse.error("记录不存在")
+    
+    # Update fields from request data
+    record.status = request.data.get('status', record.status)
+    record.courier_name = request.data.get('courier_name', record.courier_name)
+    record.tracking_number = request.data.get('tracking_number', record.tracking_number)
+    record.receiver_info = request.data.get('receiver_info', record.receiver_info)
+    record.save()
+    
+    return BaseResponse.success(ShippingRecordSerializer(record).data, message="物流状态更新成功")
 
 @api_view(['POST'])
 def balance_recharge(request):

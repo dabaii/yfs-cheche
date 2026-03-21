@@ -53,12 +53,28 @@ class StoreSerializer(serializers.ModelSerializer):
         model = Store
         fields = '__all__'
 
+class ShippingItemSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(source='prize.type', read_only=True)
+    name = serializers.CharField(source='prize.name', read_only=True)
+
+    class Meta:
+        model = ItemRecord
+        fields = ['id', 'type', 'name', 'seat_number']
+
 class ItemRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = ItemRecord
         fields = '__all__'
 
 class ShippingRecordSerializer(serializers.ModelSerializer):
+    items = ShippingItemSerializer(many=True, read_only=True)
+    date = serializers.SerializerMethodField()
+
     class Meta:
         model = ShippingRecord
-        fields = '__all__'
+        fields = ['id', 'status', 'method', 'receiver_info', 'pickup_code', 'courier_name', 'tracking_number', 'items', 'date']
+
+    def get_date(self, obj):
+        if obj.created_at:
+            return obj.created_at.strftime('%Y-%m-%d %H:%M')
+        return ''
